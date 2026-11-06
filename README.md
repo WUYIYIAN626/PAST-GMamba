@@ -4,7 +4,7 @@ Official implementation of the manuscript
 
 **PAST-GMamba: Persistence-Anchored Parallel Spatio-Temporal Graph Mamba for Multi-Site Photovoltaic Power Forecasting**
 
-The code will be made public after the paper is published. A bibliographic entry will be added at that time.
+The code will be made public after the paper is published. 
 
 ## Architecture
 
