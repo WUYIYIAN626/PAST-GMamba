@@ -4,19 +4,7 @@ Official code repository for the manuscript:
 
 **PAST-GMamba: Persistence-Anchored Parallel Spatio-Temporal Graph Mamba for Multi-Site Photovoltaic Power Forecasting**
 
-Yiyan Wu and Xiaobo Xu. School of Electronics and Control Engineering, Chang'an University, Xi'an, China. Corresponding author: Xiaobo Xu (xuxiaobo@chd.edu.cn).
-
-The manuscript has not been published. This repository is private. The code will be made public after the paper is published. A bibliographic entry will be added at that time.
-
-## Model
-
-PAST-GMamba forecasts the power of 238 photovoltaic sites at a 5-minute resolution. It anchors each forecast to the latest observation and learns the lead-specific deviation from that observation. Two streams run in parallel:
-
-- **TriGraph Stream** models cross-site dependence with Local Graph Conditioning (LGC), a Graph-Transition Selective Scan (GTSS), and Neighbor–Lag Joint Attention (NLJA).
-- **LR-Mamba Stream** encodes power level and causal ramp with separate Mamba memories, then aligns them to each forecast step with future-time queries.
-- **Spatiotemporal Feature Fusion** combines the two streams, and the **Prediction Head** emits the residual correction.
-
-The default configuration uses `prediction_target: persistence_residual`. Setting it to `absolute` predicts power directly. The temporal scan defaults to Mamba and can be replaced by LSTM, GRU, or TCN through `temporal_mixer`.
+The code will be made public after the paper is published. A bibliographic entry will be added at that time.
 
 ## Overall architecture
 
@@ -72,65 +60,6 @@ Install the test dependencies when running the unit tests:
 ```bash
 pip install -r requirements-dev.txt
 ```
-
-## Dataset
-
-The model reads the California multi-site DPV records. Place the following files in one directory and point `PAST_GMAMBA_DATA_ROOT` at that directory:
-
-```text
-onemonth_combined.csv
-threemonth_combined.csv
-sixmonth_combined.csv
-allyear_combined.csv
-site_metadata.csv
-node_list.json
-distance_matrix_km.csv
-```
-
-`site_metadata.csv` must contain `node_id`, `filename`, `latitude`, `longitude`, `weather_year`, `pv_type`, `capacity_mw`, `interval_min`, and `data_type`. `node_list.json` must list the same site filenames in the same order. The combined tables contain 238 sites. Power is converted to per-unit values with each site's `capacity_mw` and is not clipped at 1. `distance_matrix_km.csv` is required by the default sparse geographic graph. `adj_matrix_adaptive_geo.csv` is used only when `graph.source` is `provided`.
-
-The four spans and their lengths are:
-
-| Span | File | Steps |
-|---|---|---|
-| `onemonth` | `onemonth_combined.csv` | 8,928 |
-| `threemonth` | `threemonth_combined.csv` | 25,920 |
-| `sixmonth` | `sixmonth_combined.csv` | 52,128 |
-| `allyear` | `allyear_combined.csv` | 105,120 |
-
-Validate the files without writing a cache:
-
-```bash
-export PAST_GMAMBA_DATA_ROOT=/path/to/ca_dpv_data
-python -m past_gmamba.cli.prepare \
-  --data-root "$PAST_GMAMBA_DATA_ROOT" \
-  --check-only \
-  --span allyear
-```
-
-Build the memory-mapped cache used by training:
-
-```bash
-python -m past_gmamba.cli.prepare \
-  --data-root "$PAST_GMAMBA_DATA_ROOT" \
-  --cache-dir artifacts/cache \
-  --span onemonth
-```
-
-Repeat `--span` for `threemonth`, `sixmonth`, and `allyear` before training those spans. The cache stores contiguous float32 arrays. Training slices windows from this cache and does not materialize every window in advance.
-
-## Training
-
-Paper experiments use the configurations in `configs/spatial_v2/`. Each file fixes one span and one forecast task:
-
-| Task | History | Horizon | Lead time |
-|---|---|---|---|
-| `12_1` | 12 | 1 | 5 min |
-| `24_6` | 24 | 6 | 30 min |
-| `72_12` | 72 | 12 | 60 min |
-
-The twelve paper runs are the four spans crossed with these three tasks. A configuration already selects persistence-residual prediction, the Mamba temporal mixer, AdamW at `3e-4`, and a maximum of 80 epochs.
-
 Train one run into an empty directory:
 
 ```bash
@@ -224,23 +153,3 @@ python -m past_gmamba.cli.verify_evaluation \
   --split test \
   --require-full-split
 ```
-
-A finished run directory contains `resolved_config.yaml`, `environment.json`, `history.json`, `training_summary.json`, `best.pt`, and `last.pt`. If a numerical check fails, training stops before the optimizer step and writes `numerical_failure.json`.
-
-## Repository layout
-
-```text
-overall-architecture.png                   Overall architecture figure
-src/past_gmamba/models/spatial.py          TriGraph Stream
-src/past_gmamba/models/temporal.py         LR-Mamba Stream
-src/past_gmamba/models/fusion.py           Spatiotemporal Feature Fusion
-src/past_gmamba/models/decoder.py          Prediction Head
-src/past_gmamba/models/spatiotemporal.py   PAST-GMamba model
-configs/spatial_v2/                        Twelve paper training configurations
-configs/smoke/                             Short forward and training checks
-requirements.txt
-requirements-dev.txt
-requirements-mamba.txt
-```
-
-Command-line entry points installed with the package are `past-gmamba-prepare`, `past-gmamba-train`, `past-gmamba-evaluate`, `past-gmamba-check-env`, `past-gmamba-verify-run`, and `past-gmamba-verify-evaluation`. The equivalent module commands are `python -m past_gmamba.cli.<command>`.
